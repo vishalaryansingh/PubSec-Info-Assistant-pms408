@@ -25,4 +25,3 @@ output "cognitiveServiceID" {
 output "cognitiveServiceEndpoint" {
   value = azurerm_cognitive_account.cognitiveService.endpoint
 }
-

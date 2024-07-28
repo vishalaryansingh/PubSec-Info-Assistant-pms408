@@ -19,7 +19,7 @@ resource "azurerm_resource_group" "rg" {
   location = var.location
   tags     = local.tags
 }
-
+/*
 module "entraObjects" {
   source                            = "./core/aad"
   isInAutomation                    = var.isInAutomation
@@ -34,7 +34,7 @@ module "entraObjects" {
   serviceManagementReference        = var.serviceManagementReference
   password_lifetime                 = var.password_lifetime
 }
-
+*/
 module "logging" {
   source = "./core/logging/loganalytics"
 
@@ -185,8 +185,10 @@ module "backend" {
     ENABLE_MULTIMEDIA                       = var.enableMultimedia
     MAX_CSV_FILE_SIZE                       = var.maxCsvFileSize
   }
+   // change this to the actual client id from the app registration when app is registered, putting in subscriptionid as stop gap
+  //aadClientId = module.entraObjects.azure_ad_web_app_client_id
+  aadClientId = "e6fd1f79-f09d-44b7-8537-317b9d8a5aef"
 
-  aadClientId = module.entraObjects.azure_ad_web_app_client_id
   depends_on = [ module.kvModule ]
 }
 
@@ -278,16 +280,12 @@ module "cosmosdb" {
   source = "./core/db"
 
   name                = "infoasst-pms408-cosmos-${random_string.random.result}"
-  location            = var.location
+ // location            = var.location
+  location            = "usgovarizona"    // cosmosdb not available in usgovvirginia
   tags                = local.tags
   logDatabaseName   = "statusdb"
   logContainerName  = "statuscontainer"
   resourceGroupName = azurerm_resource_group.rg.name
-  keyVaultId        = module.kvModule.keyVaultId  
-  
-  depends_on = [
-    module.kvModule
-  ]
 }
 
 
@@ -374,7 +372,7 @@ module "sharepoint" {
     module.storage
   ]
 }
-
+/*
 module "video_indexer" {
   count                               = var.enableMultimedia ? 1 : 0
   source                              = "./core/videoindexer"
@@ -387,7 +385,7 @@ module "video_indexer" {
   arm_template_schema_mgmt_api        = var.arm_template_schema_mgmt_api
   video_indexer_api_version           = var.video_indexer_api_version
 }
-
+*/
 // USER ROLES
 module "userRoles" {
   source = "./core/security/role"
@@ -450,7 +448,7 @@ module "storageRoleFunc" {
   subscriptionId   = data.azurerm_client_config.current.subscription_id
   resourceGroupId  = azurerm_resource_group.rg.id
 }
-
+/*
 module "aviRoleBackend" {
   source            = "./core/security/role"
   count             = var.enableMultimedia ? 1 : 0
@@ -475,7 +473,7 @@ module "openAiRoleMgmt" {
   subscriptionId   = data.azurerm_client_config.current.subscription_id
   resourceGroupId  = azurerm_resource_group.rg.id
 }
-
+*/
 module "azMonitor" {
   source            = "./core/logging/monitor"
   logAnalyticsName  = module.logging.logAnalyticsName
@@ -490,7 +488,8 @@ module "kvModule" {
   name              = "infoasst-pms408-kv-${random_string.random.result}"
   location          = var.location
   kvAccessObjectId  = data.azurerm_client_config.current.object_id 
-  spClientSecret    = module.entraObjects.azure_ad_mgmt_app_secret 
+ // spClientSecret    = module.entraObjects.azure_ad_mgmt_app_secret 
+  spClientSecret    = "module.entraObjects.azure_ad_mgmt_app_secret" 
   subscriptionId    = var.subscriptionId
   resourceGroupId   = azurerm_resource_group.rg.id 
   resourceGroupName = azurerm_resource_group.rg.name
