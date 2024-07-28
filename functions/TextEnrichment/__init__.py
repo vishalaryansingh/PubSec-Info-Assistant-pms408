@@ -36,8 +36,8 @@ max_requeue_count = int(os.environ["MAX_ENRICHMENT_REQUEUE_COUNT"])
 enrichment_backoff = int(os.environ["ENRICHMENT_BACKOFF"])
 azure_blob_content_storage_container = os.environ["BLOB_STORAGE_ACCOUNT_OUTPUT_CONTAINER_NAME"]
 queueName = os.environ["EMBEDDINGS_QUEUE"]
-azure_ai_translation_domain = os.environ["AZURE_AI_TRANSLATION_DOMAIN"]
-azure_ai_text_analytics_domain = os.environ["AZURE_AI_TEXT_ANALYTICS_DOMAIN"]
+#azure_ai_translation_domain = os.environ["AZURE_AI_TRANSLATION_DOMAIN"]
+#azure_ai_text_analytics_domain = os.environ["AZURE_AI_TEXT_ANALYTICS_DOMAIN"]
 
 FUNCTION_NAME = "TextEnrichment"
 MAX_CHARS_FOR_DETECTION = 1000
@@ -61,12 +61,14 @@ def main(msg: func.QueueMessage) -> None:
     the target language, it will translate the chunks to the target language.'''
 
     try:
-        endpoint_region = enrichmentEndpoint.split("https://")[1].split(".api")[0]            
+#        endpoint_region = enrichmentEndpoint.split("https://")[1].split(".api")[0]            
 
-        apiDetectEndpoint = f"https://{azure_ai_translation_domain}/detect?api-version=3.0"
-        apiTranslateEndpoint = f"https://{azure_ai_translation_domain}/translate?api-version=3.0"
-        enrich_endpoint = f"https://{endpoint_region}.{azure_ai_text_analytics_domain}/language/:analyze-text?api-version=2022-05-01"
-        
+ #       apiDetectEndpoint = f"https://{azure_ai_translation_domain}/detect?api-version=3.0"
+ #       apiTranslateEndpoint = f"https://{azure_ai_translation_domain}/translate?api-version=3.0"
+ #       enrich_endpoint = f"https://{endpoint_region}.{azure_ai_text_analytics_domain}/language/:analyze-text?api-version=2022-05-01"
+        apiTranslateEndpoint = f"{enrichmentEndpoint}translator/text/v3.0/translate?api-version=3.0"
+        apiLanguageEndpoint = f"{enrichmentEndpoint}language/:analyze-text?api-version=2023-04-01"
+
         message_body = msg.get_body().decode("utf-8")
         message_json = json.loads(message_body)
         blob_path = message_json["blob_name"]       
@@ -110,13 +112,25 @@ def main(msg: func.QueueMessage) -> None:
         headers = {
             'Ocp-Apim-Subscription-Key': enrichmentKey,
             'Content-type': 'application/json',
-            'Ocp-Apim-Subscription-Region': endpoint_region
+            #'Ocp-Apim-Subscription-Region': endpoint_region
         }            
-        data = [{"text": chunk_content}]
-
-        response = requests.post(apiDetectEndpoint, headers=headers, json=data)      
+       # data = [{"text": chunk_content}]
+        data = {
+            "kind": "LanguageDetection",
+            "analysisInput":{
+                "documents":[
+                    {
+                        "id":"1",
+                        "text": chunk_content
+                    }
+                ]
+            }
+        }
+        #response = requests.post(apiDetectEndpoint, headers=headers, json=data)   
+        response = requests.post(apiLanguageEndpoint, headers=headers, json=data)   
         if response.status_code == 200:
-            detected_language = response.json()[0]['language']
+            #detected_language = response.json()[0]['language']
+            detected_language = response.json()["results"]["documents"][0]["detectedLanguage"]["iso6391Name"]
             statusLog.upsert_document(
                 blob_path,
                 f"{FUNCTION_NAME} - detected language of text is {detected_language}.",
@@ -173,7 +187,8 @@ def main(msg: func.QueueMessage) -> None:
                     ]
                 }
             }                
-            response = requests.post(enrich_endpoint, headers=enrich_headers, json=enrich_data, params=params)
+            #response = requests.post(enrich_endpoint, headers=enrich_headers, json=enrich_data, params=params)
+            response = requests.post(apiLanguageEndpoint, headers=enrich_headers, json=enrich_data, params=params)
             try:
                 entities = response.json()['results']['documents'][0]['entities']
             except:
@@ -204,7 +219,8 @@ def main(msg: func.QueueMessage) -> None:
                     ]
                 }
             }                
-            response = requests.post(enrich_endpoint, headers=enrich_headers, json=enrich_data, params=params)
+            #response = requests.post(enrich_endpoint, headers=enrich_headers, json=enrich_data, params=params)
+            response = requests.post(apiLanguageEndpoint, headers=enrich_headers, json=enrich_data, params=params)
             try:
                 key_phrases = response.json()['results']['documents'][0]['keyPhrases']
             except:
